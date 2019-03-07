@@ -1,6 +1,6 @@
 ---
 title: "HUDK4051: Social Network Analysis"
-author: "Charles Lang"
+author: "Juan Djuwadi"
 date: "1/26/2018"
 output: html_document
 ---
@@ -21,10 +21,45 @@ The data were collected by Vickers & Chan from 29 seventh grade students in a sc
 You have a data set for each of these questions, please complete the following tasks.
 
 ## Data Wrangling
-
+  
 Manipulate each of the data sets so that it is suitable for building a social network using iGraph.
 
 ```{r}
+library(dplyr)
+
+BF <- read.csv("best.friends.csv")
+
+GO <- read.csv("get.on.with.csv")
+
+WORK <- read.csv("work.with.csv")
+
+EDGEbf <- dplyr::select(BF, from, to)
+EDGEgo <- dplyr::select(GO, from, to)
+EDGEwork <- dplyr::select(WORK, from, to)
+
+VERTEX <- dplyr::select(BF, from, gender.from)
+VERTEX <- unique(VERTEX)
+
+#Generating in-degree and out-degree qualities
+bfIndegree <- count(EDGEbf, from)
+bfOutdegree <- count(EDGEbf, to)
+VERTEXbf <- cbind(VERTEX, bfIndegree$n, bfOutdegree$n)
+names(VERTEXbf) <- c("from", "gender.from", "indegree.count", "outdegree.count")
+
+goIndegree <- count(EDGEgo, from)
+goOutdegree <- count(EDGEgo, to)
+VERTEXgo <- cbind(VERTEX, goIndegree$n, goOutdegree$n)
+names(VERTEXgo) <- c("from", "gender.from", "indegree.count", "outdegree.count")
+
+workIndegree <- count(EDGEwork, from)
+workOutdegree <- count(EDGEwork, to)
+workOutdegree1 <- workOutdegree[1:8,]
+count9 <- c("9", "0")
+workOutdegree1 <- rbind(workOutdegree1, count9)
+workOutdegree <- rbind(workOutdegree1, workOutdegree[9:28,])
+VERTEXwork <- cbind(VERTEX, workIndegree$n, workOutdegree$n)
+names(VERTEXwork) <- c("from", "gender.from", "indegree.count", "outdegree.count")
+
 
 ```
 
@@ -33,6 +68,33 @@ Manipulate each of the data sets so that it is suitable for building a social ne
 Create a graph for each of the data sets, are the graphs directed or undirected? Visualize each of the graphs you have created and color the nodes according to gender. Save pdfs of your graphs in this directory for upload to Github.
 
 ```{r}
+library(igraph) 
+
+layout.by.attr <- function(graph, wc, cluster.strength=1,layout=layout.auto) {  
+  g <- graph.edgelist(get.edgelist(graph)) # create a lightweight copy of graph w/o the attributes.
+  E(g)$weight <- 1 
+
+  attr <- cbind(id=1:vcount(g), val=wc)
+  g <- g + vertices(unique(attr[,2])) + igraph::edges(unlist(t(attr)), weight=cluster.strength) 
+
+  l <- layout(g, weights=E(g)$weight)[1:vcount(graph),] 
+  return(l) 
+} 
+set.seed(3) 
+
+#gbf 
+gbf <- graph.data.frame(EDGEbf, directed=TRUE, vertices=VERTEX)
+plot(gbf,layout=layout.by.attr(gbf, wc = 1), vertex.color = VERTEX$gender.from, edge.arrow.size = 0.3, vertex.label.cex = 0.5, vertex.frame.color = NA, vertex.size = VERTEXbf$indegree.count * 2, asp = 0.5)
+
+#ggo
+ggo <- graph.data.frame(EDGEgo, directed=TRUE, vertices=VERTEX)
+plot(ggo,layout=layout.by.attr(ggo, wc = 1), vertex.color = VERTEX$gender.from, edge.arrow.size = 0.3, vertex.label.cex = 0.5, vertex.frame.color = NA, vertex.size = VERTEXgo$indegree.count *1.2, asp = 0.5 )
+
+#gwork
+ggwork <- graph.data.frame(EDGEwork, directed=TRUE, vertices=VERTEX)
+plot(ggwork,layout=layout.by.attr(ggwork, wc = 1), vertex.color = VERTEX$gender.from, edge.arrow.size = 0.3, vertex.label.cex = 0.5, vertex.frame.color = NA, vertex.size = VERTEXwork$indegree.count * 1.9, asp = 0.5 )    
+
+
 
 ```
 
@@ -40,33 +102,81 @@ Create a graph for each of the data sets, are the graphs directed or undirected?
 
 Who in the class has the highest degree centrality for each measure?
 ```{r}
+degree(ggo) 
+#8 has the highest degree
+orderedInDegreeGGO <- goIndegree[order(goIndegree$n),]
+#8 and 11
+orderedOutDegreeGGO <- goOutdegree[order(goOutdegree$n),]
+#14 and 16
 
+degree(gbf) 
+#8 has the highest degree
+orderedInDegree <- bfIndegree[order(bfIndegree$n),]
+#8
+orderedOutDegree <- bfOutdegree[order(bfOutdegree$n),]
+#21
+
+
+
+degree(ggwork) 
+#6 has the highest degree
+orderedInDegreeWork <- workIndegree[order(workIndegree$n),]
+#6
+orderedOutDegreeWork <- workOutdegree[order(workOutdegree$n),]
+#16
 ```
-
+1. Who do you get on with in the class?  
+2. Who are your best friends in the class?  
+3. Who would you prefer to work with?  
 Does **degree centrality** mean the same thing for each of your networks? Does it make sense for each of your networks?
+
+#Degree centrality represents the number of edges (both in-degree and out-degree) that the particular node possesses. Since the survey question differs from one network to the next, the graphs do not mean the exact same thing. We see that for the first network, many people express getting along with person 8 and 11. This overlaps with the highest in-degree of the second question - who are your best friends in the class? - where 8 posesses the highest in-degree and overall degree as well. However, we see that in the final network, 6 has the highest degree and in-degree. Meaning that the indviduals we get along with or those we consider our best friends aren't likely to be the people we would choose to conduct assignments with. We see from the out degrees that node 16 has a tendency to select many people in his/her asnwers. Node 21 is a bit of an anomaly, expressing his/her "best friend" relationship with a number of people, but having fewer edge cases with regards to those he/she gets along with. 
 
 Who in the class has the highest closeness centrality?
 
 ```{r}
+closenessGBF <- closeness(gbf)
+V(gbf)[which.max(closenessGBF)] 
+#8
+
+closenessGGO <- closeness(ggo)
+V(ggo)[which.max(closenessGGO)]
+#8
+
+closenessGGWORK <- closeness(ggwork)
+V(ggwork)[which.max(closenessGGWORK)]
+#9
+
+#It appears node 8 has the highest closeness centrality in general. 
 
 ```
 
 How does **betweeness centrality** differ from degree centrality? Is one more useful than the other? Does their utility differ between your three networks?
 
-## Simple structures
+## Degree centrality refers to the significance of a node depending on the edges that node posesses. Betweeness centrality, on the other hand, refers to the occurences that a particular node lies in the shortest path between other nodes. I don't think one is necessarily more useful than the other, it depends on what kind of information you'd like to collect. We can use degree centrality to assess popular indviduals and those who are well connected with everybody as an individual - this is the person with the most overlap when asked the questions the three networks are based on. We can use betweeness centrality to determien nodes with the highest influence on the flow of the system. It is likely that this person/node acts an important bridge for communication dynamics. This person may not have the most connections, but has important connections that link all the nodes more cohesively. 
 
 Count the number of dyads and the number and type of triads using the following commands.
 ```{r}
-dyad_census()
+dyad_census(gbf) 
+
+dyad_census(ggo)
+
+dyad_census(ggwork)
 ```
 [Documentation](http://igraph.org/r/doc/dyad_census.html)
 
 ```{r}
-triad_census()
+triad_census(gbf)
+# [1] 1297  791  746  118   26   75  123  214   34    2   39   59   38    3   43   46
+triad_census(ggo)
+#[1] 329 510 632 186  55  88 235 432  97   8 215 193 120  75 287 192
+triad_census(ggwork)
+#[1] 1022  999  528  187  116  132  108  177   88    0   18  102   81   19   40   37
 ```
 [Documentation](http://igraph.org/r/doc/triad_census.html)
 
-Do these metrics tell you anything about the networks? If so what?
+Do these metrics tell you anything about the networks? If so what? 
+#Lots of people are not connected to one another as much as they could be. The group is not that close as a consensus. We see that a
 
 ## Cliques
 
@@ -75,27 +185,72 @@ Answer the following questions using the [clique functions](http://igraph.org/r/
 What is the size of the largest clique(s) in each of the three networks?
 
 ```{r}
+clique_num(gbf)
+#7
 
+clique_num(ggo)
+#12
+
+clique_num(ggwork)
+#9
 ```
 
 Which nodes/vertices are in the largest cliques for the three networks? Is there much overlap?
 
+#a as as  d d
+
 ```{r}
+lc.bff <- largest_cliques(gbf)
+
+lc.ggo <- largest_cliques(ggo)
+
+lc.work <- largest_cliques(ggwork)
+
+lc.bff.overlap <- Reduce(intersect, lc.bff)
+lc.ggo.overlap <- Reduce(intersect, lc.ggo)
+lc.work.overlap <- Reduce(intersect, lc.work)
+
+network.overlap <- Reduce(intersect, c(lc.bff, lc.ggo, lc.work))
+network.overlap
+
+#14 20 22 
+#These nodes have the most overlap among each other. 
 
 ```
 
 How many **maximal cliques** are there in each of the networks?
 
 ```{r}
+count_max_cliques(gbf)
+#35
 
+count_max_cliques(ggo)
+#64
+
+count_max_cliques(ggwork)
+#36
 ```
 
 ## Components & Cutpoints
 
 Find the cutpoints (articulation points) for each of the three networks you generated. What does this tell you about the graphs? Does what you find match a visual exploration of the networks?
 
+# Articulation points are points that keep the overall structure stable - when removing the points it will disconnect the graph. Essentially these points represent vulnerabilities within the network. We see that for two of the networks there exists only two articulation points in the system. This indicates that the two graphs are quite well connnected to each other. These findings do match, the network seems pretty crowded with a lot of edges.
+
+```{r}
+install.packages("sna")
+library(sna)
+
+
+articulation_points(ggo) #0
+articulation_points(gbf) #13
+articulation_points(ggwork) #13
+```
+
 ## Putting it all together
 
 Write a narrative description of the social ties among members of this 7th grade class using the network, centrality and structural metrics you have developed. Can you provide any recommendations to the teacher of this class based on your analysis? What other information would you want to know? Can you remeber being in seventh grade, does this refelct your experience?
+
+#Everybody generally gets along with each other. The change between degree centrality between the network of best friends and those they get along with indicates that perhaps those who are good friends with each other may not nescessarily be the ones we'd like to work with - that, or person 6 is known to be intelligent or good to work with. The small amount of articulation points indicate the structure is stable and that the network is relatively interconnected. However, the amount of null connections in the triad_census show room for improvement in terms of interconnectedness. I would recommend to teachers to create more activities with randomized groups - this would increase interconnectedness between people. I'd like to know the grades of the people as well, and whether those people with similar grades selected each other to work with, to be best friends with, or to be someone they get along with. Yes, it's quite accurate. We were all quite close, there were a couple of people who didn't really interact with anybody. I'd say our null triad_census was far less however. 
 
 ```{r}
